@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Motor de decisión</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <h1>Motor de decisión</h1>
+  <p>Rangos informativos, nunca una orden — vos decidís.</p>
+</header>
+
+<main>
+
+  <!-- ===================== VISTA: DECISIÓN ===================== -->
+  <section id="view-decision" class="view active">
+
+    <div class="card-panel">
+      <h2>Mano en curso</h2>
+      <p class="hint" id="hand-status-text">Sin mano activa — tocá "Nueva mano" para empezar.</p>
+      <button class="primary" id="btn-new-hand">Nueva mano</button>
+    </div>
+
+    <div id="hand-active-ui" style="display:none">
+
+      <div class="card-panel">
+        <h2>Mesa</h2>
+        <div class="field">
+          <label>Jugadores en la mesa (2 a 10)</label>
+          <input type="number" id="table-size-input" min="2" max="10" value="6">
+        </div>
+        <p class="hint" style="margin:8px 0">Tocá los asientos que juegan ESTA mano (empiezan todos activos):</p>
+        <div class="seat-row" id="seat-config-row"></div>
+        <button class="secondary" id="btn-apply-table-size">Aplicar</button>
+      </div>
+
+      <div class="card-panel">
+        <h2>Mi mano</h2>
+        <div class="field">
+          <label>Mis 2 cartas</label>
+          <div id="hero-slots" class="card-slots"></div>
+        </div>
+        <div class="field" id="initial-pot-field">
+          <label>Bote inicial (ciegas/antes) — se usa UNA sola vez, al arrancar la mano</label>
+          <input type="number" id="initial-pot" placeholder="30" value="0">
+        </div>
+      </div>
+
+      <div class="card-panel">
+        <h2>Board — <span id="current-street-label" class="badge">preflop</span></h2>
+        <div class="field">
+          <label>Cartas comunitarias de esta calle</label>
+          <div id="board-slots" class="card-slots"></div>
+        </div>
+      </div>
+
+      <div class="card-panel">
+        <h2>Bote actual: <span class="num" id="pot-display">0</span></h2>
+        <p class="hint" style="margin-bottom:10px">Tocá un asiento (o "MI JUGADA") y elegí qué hizo. "Pagar" ya calcula solo cuánto hace falta.</p>
+        <div class="seat-row" id="seat-action-row"></div>
+        <div id="action-chooser-container"></div>
+        <div id="action-log-list" style="margin-top:10px"></div>
+        <p class="hint" id="facing-bet-hint" style="margin-top:10px"></p>
+        <div class="field" id="contemplated-bet-field" style="display:none; margin-top:10px">
+          <label>Si pensás apostar (nadie te apostó todavía), ¿cuánto? — opcional, activa candidatos de apostar en "Calcular"</label>
+          <input type="number" id="contemplated-bet" placeholder="ej. 300">
+        </div>
+      </div>
+
+      <details class="collapsible card-panel">
+        <summary>Jugadores — posición y rango de cada uno (opcional)</summary>
+        <p class="hint" style="margin-bottom:10px">La posición se carga UNA vez y queda para toda la mano.</p>
+        <div id="players-panel"><p class="hint">Todavía no hay jugadores — configurá la mesa arriba.</p></div>
+      </details>
+
+      <details class="collapsible card-panel">
+        <summary>Más opciones — activa Puntos 4 y 11</summary>
+        <p class="hint" style="margin-bottom:10px">Tu posición (no la del rival) para comparar tu lectura contra la teoría estándar.</p>
+        <div class="row">
+          <div class="field">
+            <label>Tu posición</label>
+            <select id="hero-position">
+              <option value="">— sin especificar —</option>
+              <option value="early">Temprana</option>
+              <option value="middle">Media</option>
+              <option value="late">Tardía</option>
+              <option value="button">Botón</option>
+              <option value="sb">Ciega chica</option>
+              <option value="bb">Ciega grande</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Jugadores en mesa</label>
+            <input type="number" id="num-players" placeholder="6">
+          </div>
+        </div>
+        <div class="field">
+          <label>Mi propio rango representado (para detectar farol — notación)</label>
+          <input type="text" id="hero-range" placeholder="AKo, AKs, QQ+">
+        </div>
+        <div class="field">
+          <label>Cartas muertas</label>
+          <div id="dead-slots" class="card-slots"></div>
+        </div>
+      </details>
+
+      <button class="primary" id="btn-calcular">Calcular</button>
+
+      <div id="decision-results"></div>
+
+      <button class="secondary" id="btn-next-street" style="margin-top:14px">Siguiente calle →</button>
+
+    </div>
+
+  </section>
+
+  <!-- ===================== VISTA: JUGADORES ===================== -->
+  <section id="view-players" class="view">
+    <div class="card-panel">
+      <h2>Jugadores con historial</h2>
+      <div id="players-list"><div class="empty-state">Todavía no registraste ninguna mano.</div></div>
+    </div>
+    <div id="player-detail"></div>
+  </section>
+
+  <!-- ===================== VISTA: MANOS ===================== -->
+  <section id="view-hands" class="view">
+    <div class="card-panel">
+      <h2>Registrar mano cerrada</h2>
+      <p class="hint" style="margin-bottom:12px">Esto alimenta el historial (VPIP/PFR/sizing-tells/imagen propia) — cuanto más completo, mejor van a leer los puntos que dependen de datos reales.</p>
+
+      <div class="field">
+        <label>ID de la mano</label>
+        <input type="text" id="hand-id" placeholder="ej. mesa1-mano-042">
+      </div>
+      <div class="field">
+        <label>Jugadores (separados por coma, "hero" incluido)</label>
+        <input type="text" id="hand-players" placeholder="hero, villain_1, villain_2">
+      </div>
+      <div class="field">
+        <label>Board (opcional)</label>
+        <div id="hand-board-slots" class="card-slots"></div>
+      </div>
+
+      <div class="field">
+        <label>Acciones</label>
+        <div id="hand-actions-list"></div>
+        <button class="secondary" id="btn-add-action" style="margin-top:8px">+ agregar acción</button>
+      </div>
+
+      <div class="field">
+        <label>Ganador(es) (separados por coma)</label>
+        <input type="text" id="hand-winners" placeholder="hero">
+      </div>
+      <div class="field">
+        <label>¿Hubo showdown?</label>
+        <div class="toggle-group" id="showdown-toggle">
+          <div class="toggle-chip" data-v="true">Sí</div>
+          <div class="toggle-chip selected" data-v="false">No</div>
+        </div>
+      </div>
+      <div class="field" id="showdown-hands-field" style="display:none">
+        <label>Manos mostradas (jugador:carta1,carta2; separado por ;)</label>
+        <input type="text" id="hand-showdown-hands" placeholder="villain_1:As,Ac; hero:Kh,Kd">
+      </div>
+
+      <button class="primary" id="btn-submit-hand">Guardar mano</button>
+      <div id="hand-submit-result"></div>
+    </div>
+  </section>
+
+  <!-- ===================== VISTA: SESIÓN ===================== -->
+  <section id="view-session" class="view">
+    <div class="card-panel">
+      <h2>Resumen de la sesión</h2>
+      <div id="session-summary"><div class="empty-state">Todavía no registraste ninguna decisión.</div></div>
+    </div>
+    <div class="card-panel">
+      <h2>Manos para repasar</h2>
+      <div id="session-hands-to-review"></div>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabs">
+  <button data-view="decision" class="active"><span class="icon">♠</span>Decisión</button>
+  <button data-view="players"><span class="icon">◎</span>Jugadores</button>
+  <button data-view="hands"><span class="icon">✎</span>Manos</button>
+  <button data-view="session"><span class="icon">▤</span>Sesión</button>
+</nav>
+
+<script src="app.js"></script>
+</body>
+</html>
