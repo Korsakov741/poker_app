@@ -59,7 +59,7 @@
 
       <div class="card-panel">
         <h2>Bote actual: <span class="num" id="pot-display">0</span></h2>
-        <p class="hint" style="margin-bottom:10px">Tocá un asiento (o "MI JUGADA") y elegí qué hizo. "Pagar" ya calcula solo cuánto hace falta.</p>
+        <p class="hint" style="margin-bottom:10px">Tocá el asiento del rival que actuó y elegí qué hizo. "Pagar" ya calcula solo cuánto hace falta. Tu jugada va después, abajo de "Calcular".</p>
         <div class="seat-row" id="seat-action-row"></div>
         <div id="action-chooser-container"></div>
         <div id="action-log-list" style="margin-top:10px"></div>
@@ -110,6 +110,13 @@
       <button class="primary" id="btn-calcular">Calcular</button>
 
       <div id="decision-results"></div>
+
+      <div class="card-panel" id="hero-action-panel" style="border-color: var(--gold)">
+        <h2>Mi jugada</h2>
+        <p class="hint" style="margin-bottom:10px">Ya viste el cálculo de arriba — ahora registrá qué hiciste vos.</p>
+        <div class="seat-row" id="hero-action-trigger-row"></div>
+        <div id="hero-action-chooser-container"></div>
+      </div>
 
       <button class="secondary" id="btn-next-street" style="margin-top:14px">Siguiente calle →</button>
 

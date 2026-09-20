@@ -17,6 +17,7 @@ from poker_engine.equity import calculate_equity
 from poker_engine.gto_lite.pot_math import implied_odds_adjusted_alpha
 from poker_engine.gto_lite.opening_ranges import opening_range
 from poker_engine.board.combos_vs_hand import combos_beating_hero
+from poker_engine.board.hand_breakdown import hand_type_breakdown
 from poker_engine.profile import build_player_profile
 from poker_engine.profile.sizing_tells import pot_bucket
 from poker_engine.bluff_detector import detect_bluff_opportunity, MIN_OBSERVATIONS_FOLD_RATE
@@ -71,12 +72,18 @@ def compute_decision(req: DecisionRequest):
     combos_result = None
     villain_continue_rate = None
     bluff_opportunity = None
+    breakdown = None
 
     if primary_range is not None and len(req.board) >= 3:
         try:
             combos_result = combos_beating_hero(req.hero, req.board, req.dead, primary_range)
         except (ValueError, RuntimeError):
             combos_result = None
+
+        try:
+            breakdown = hand_type_breakdown(req.hero, req.board, req.dead, primary_range)
+        except (ValueError, RuntimeError):
+            breakdown = None
 
         if req.bet and req.pot:
             bucket = pot_bucket(req.bet / req.pot)
@@ -203,5 +210,10 @@ def compute_decision(req: DecisionRequest):
         "gto_exploit": None if gto_exploit is None else {
             "weight_exploit_final": round(gto_exploit.weight_exploit_final, 3),
             "reasoning": gto_exploit.reasoning,
+        },
+        "hand_breakdown": None if breakdown is None else {
+            "hero_hand_type": breakdown.hero_hand_type,
+            "villain_top_types": [{"name": n, "pct": p} for n, p in breakdown.villain_top_types],
+            "danger_cards": breakdown.danger_cards,
         },
     }

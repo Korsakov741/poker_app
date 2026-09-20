@@ -332,6 +332,7 @@ function refreshHandUI() {
   }
 
   refreshSeatActionRow();
+  refreshHeroActionTrigger();
   renderActionChooser();
   refreshPlayersPanel();
 }
@@ -340,17 +341,11 @@ function refreshSeatActionRow() {
   const row = document.getElementById('seat-action-row');
   row.innerHTML = '';
 
-  const heroBtn = document.createElement('div');
-  heroBtn.className = 'seat-btn hero-seat' + (openActionSeat === 'hero' ? ' open' : '');
-  heroBtn.textContent = 'MI JUGADA';
-  heroBtn.onclick = () => { openActionSeat = (openActionSeat === 'hero') ? null : 'hero'; refreshSeatActionRow(); renderActionChooser(); };
-  row.appendChild(heroBtn);
-
   activeNonHeroPlayers().forEach(name => {
     const btn = document.createElement('div');
     btn.className = 'seat-btn' + (openActionSeat === name ? ' open' : '');
     btn.textContent = name;
-    btn.onclick = () => { openActionSeat = (openActionSeat === name) ? null : name; refreshSeatActionRow(); renderActionChooser(); };
+    btn.onclick = () => { openActionSeat = (openActionSeat === name) ? null : name; refreshSeatActionRow(); refreshHeroActionTrigger(); renderActionChooser(); };
     row.appendChild(btn);
   });
 
@@ -362,8 +357,24 @@ function refreshSeatActionRow() {
   });
 }
 
+function refreshHeroActionTrigger() {
+  const row = document.getElementById('hero-action-trigger-row');
+  row.innerHTML = '';
+  const heroBtn = document.createElement('div');
+  heroBtn.className = 'seat-btn hero-seat' + (openActionSeat === 'hero' ? ' open' : '');
+  heroBtn.textContent = 'MI JUGADA';
+  heroBtn.onclick = () => { openActionSeat = (openActionSeat === 'hero') ? null : 'hero'; refreshSeatActionRow(); refreshHeroActionTrigger(); renderActionChooser(); };
+  row.appendChild(heroBtn);
+}
+
 function renderActionChooser() {
-  const container = document.getElementById('action-chooser-container');
+  // el selector se dibuja en un contenedor distinto según si es la
+  // acción de un rival (arriba, junto al bote) o la tuya propia (abajo,
+  // después de "Calcular") — Punto 1: tu jugada va DESPUÉS del cálculo
+  const rivalContainer = document.getElementById('action-chooser-container');
+  const heroContainer = document.getElementById('hero-action-chooser-container');
+  const container = openActionSeat === 'hero' ? heroContainer : rivalContainer;
+  (openActionSeat === 'hero' ? rivalContainer : heroContainer).innerHTML = '';
   if (!openActionSeat) { container.innerHTML = ''; return; }
 
   // ojo: esto usa la perspectiva del ASIENTO seleccionado (no la de hero) —
@@ -591,6 +602,20 @@ function renderDecisionResults(r) {
       html += `<div class="equity-seg" style="width:${p.equity_pct}%; background:${colors[idx % colors.length]}; color:${idx===0?'#1a1409':'var(--text)'}">${p.label} ${p.equity_pct}%</div>`;
     });
     html += `</div><p class="hint">Modo: ${r.equity.mode}</p></div>`;
+  }
+
+  if (r.hand_breakdown) {
+    const b = r.hand_breakdown;
+    html += '<div class="card-panel"><h2>Cantos</h2>';
+    html += `<p style="margin-bottom:8px"><strong>Vos tenés:</strong> <span class="badge">${b.hero_hand_type}</span></p>`;
+    if (b.villain_top_types.length) {
+      html += `<p style="margin-bottom:8px"><strong>Rival (más probable):</strong> ` +
+        b.villain_top_types.map(t => `<span class="badge">${t.name} ${t.pct}%</span>`).join(' ') + `</p>`;
+    }
+    if (b.danger_cards.length) {
+      html += b.danger_cards.map(d => `<p class="hint">⚠️ ${d}</p>`).join('');
+    }
+    html += '</div>';
   }
 
   html += '<div class="card-panel"><h2>Acciones candidatas</h2>';
