@@ -57,9 +57,13 @@
         </div>
       </div>
 
+      <button class="primary" id="btn-calcular">Calcular</button>
+
+      <div id="decision-results"></div>
+
       <div class="card-panel">
         <h2>Bote actual: <span class="num" id="pot-display">0</span></h2>
-        <p class="hint" style="margin-bottom:10px">Tocá el asiento del rival que actuó y elegí qué hizo. "Pagar" ya calcula solo cuánto hace falta. Tu jugada va después, abajo de "Calcular".</p>
+        <p class="hint" style="margin-bottom:10px">Tocá el asiento del rival que actuó y elegí qué hizo. "Pagar" ya calcula solo cuánto hace falta. Después volvé a tocar "Calcular" arriba si querés ver el resultado actualizado.</p>
         <div class="seat-row" id="seat-action-row"></div>
         <div id="action-chooser-container"></div>
         <div id="action-log-list" style="margin-top:10px"></div>
@@ -70,15 +74,21 @@
         </div>
       </div>
 
-      <details class="collapsible card-panel">
-        <summary>Jugadores — posición y rango de cada uno (opcional)</summary>
-        <p class="hint" style="margin-bottom:10px">La posición se carga UNA vez y queda para toda la mano.</p>
-        <div id="players-panel"><p class="hint">Todavía no hay jugadores — configurá la mesa arriba.</p></div>
-      </details>
+      <div class="card-panel" id="hero-action-panel" style="border-color: var(--gold)">
+        <h2>Mi jugada</h2>
+        <p class="hint" style="margin-bottom:10px">Ya viste el cálculo de arriba — ahora registrá qué hiciste vos.</p>
+        <div class="seat-row" id="hero-action-trigger-row"></div>
+        <div id="hero-action-chooser-container"></div>
+      </div>
 
-      <details class="collapsible card-panel">
-        <summary>Más opciones — activa Puntos 4 y 11</summary>
-        <p class="hint" style="margin-bottom:10px">Tu posición (no la del rival) para comparar tu lectura contra la teoría estándar.</p>
+      <button class="secondary" id="btn-next-street" style="margin-top:14px">Siguiente calle →</button>
+
+      <details class="collapsible card-panel" style="margin-top:24px">
+        <summary>Avanzado — posición, rangos, farol (opcional, no hace falta para jugar)</summary>
+        <p class="hint" style="margin-bottom:10px">La posición de cada rival se carga UNA vez y queda para toda la mano.</p>
+        <div id="players-panel"><p class="hint">Todavía no hay jugadores — configurá la mesa arriba.</p></div>
+
+        <h3 style="margin-top:18px; font-size:1rem">Tu posición y detección de farol</h3>
         <div class="row">
           <div class="field">
             <label>Tu posición</label>
@@ -106,19 +116,6 @@
           <div id="dead-slots" class="card-slots"></div>
         </div>
       </details>
-
-      <button class="primary" id="btn-calcular">Calcular</button>
-
-      <div id="decision-results"></div>
-
-      <div class="card-panel" id="hero-action-panel" style="border-color: var(--gold)">
-        <h2>Mi jugada</h2>
-        <p class="hint" style="margin-bottom:10px">Ya viste el cálculo de arriba — ahora registrá qué hiciste vos.</p>
-        <div class="seat-row" id="hero-action-trigger-row"></div>
-        <div id="hero-action-chooser-container"></div>
-      </div>
-
-      <button class="secondary" id="btn-next-street" style="margin-top:14px">Siguiente calle →</button>
 
     </div>
 
