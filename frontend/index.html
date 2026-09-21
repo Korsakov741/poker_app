@@ -47,8 +47,9 @@
 
       <div class="card-panel">
         <h2>Board — <span id="current-street-label" class="badge">preflop</span></h2>
+        <p class="hint" style="margin-bottom:8px">La calle se detecta sola según cuántas cartas cargues (0=preflop, 3=flop, 4=turn, 5=río).</p>
         <div class="field">
-          <label>Cartas comunitarias de esta calle</label>
+          <label>Cartas comunitarias</label>
           <div id="board-slots" class="card-slots"></div>
         </div>
       </div>
@@ -62,8 +63,6 @@
         <p class="hint" style="margin-bottom:10px">Tocá para marcar quién sigue activo y quién se retiró — eso solo ya cambia tu % de ganar.</p>
         <div class="seat-row" id="seat-action-row"></div>
       </div>
-
-      <button class="secondary" id="btn-next-street" style="margin-top:14px">Siguiente calle →</button>
 
       <details class="collapsible card-panel" style="margin-top:24px">
         <summary>Avanzado — posición, rangos, farol (opcional, no hace falta para jugar)</summary>

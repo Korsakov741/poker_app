@@ -22,13 +22,19 @@ function suitLetterOf(card) { return card[1]; }
 function isRed(card) { return suitLetterOf(card) === 'h' || suitLetterOf(card) === 'd'; }
 
 // ============================================================
-// Selector de cartas — grilla de las 52, UN toque por carta
+// Selector de cartas — grilla de las 52 SIEMPRE visible, UN
+// toque llena el próximo espacio vacío (sin elegir el espacio antes).
+// Para borrar una carta, tocás esa carta ya puesta en la fila de arriba.
 // ============================================================
 function makeCardPicker(containerId, initialMax) {
   const container = document.getElementById(containerId);
   let max = initialMax;
   let cards = [];
-  let openSlot = null;
+
+  function nextEmptyIndex() {
+    for (let i = 0; i < max; i++) if (!cards[i]) return i;
+    return -1;
+  }
 
   function render() {
     container.innerHTML = '';
@@ -40,16 +46,20 @@ function makeCardPicker(containerId, initialMax) {
       if (c) {
         slot.className = 'card-slot filled ' + (isRed(c) ? 'red' : 'black');
         slot.textContent = c[0] + SUITS.find(s => s[0] === c[1])[1];
+        slot.onclick = () => {
+          cards[i] = null;
+          render();
+          if (containerId === 'board-slots') onBoardChanged();
+        };
       } else {
         slot.className = 'card-slot empty';
         slot.textContent = '+';
       }
-      slot.onclick = () => { openSlot = (openSlot === i) ? null : i; render(); };
       slotsRow.appendChild(slot);
     }
     container.appendChild(slotsRow);
 
-    if (openSlot !== null) {
+    if (max > 0) {
       const grid = document.createElement('div');
       grid.className = 'card-grid-picker';
       RANKS.slice().reverse().forEach(r => {
@@ -57,14 +67,15 @@ function makeCardPicker(containerId, initialMax) {
         row.className = 'card-grid-row';
         SUITS.forEach(([letter, symbol]) => {
           const code = r + letter;
-          const usedElsewhere = cards.includes(code) && cards[openSlot] !== code;
+          const used = cards.includes(code);
           const cell = document.createElement('div');
-          cell.className = 'card-grid-cell' + ((letter === 'h' || letter === 'd') ? ' red' : '') + (usedElsewhere ? ' used' : '');
+          cell.className = 'card-grid-cell' + ((letter === 'h' || letter === 'd') ? ' red' : '') + (used ? ' used' : '');
           cell.textContent = r + symbol;
-          if (!usedElsewhere) {
+          if (!used) {
             cell.onclick = () => {
-              cards[openSlot] = code;
-              openSlot = null;
+              const idx = nextEmptyIndex();
+              if (idx === -1) return; // lleno — tocá una carta puesta arriba para borrarla primero
+              cards[idx] = code;
               render();
               if (containerId === 'board-slots') onBoardChanged();
             };
@@ -80,8 +91,8 @@ function makeCardPicker(containerId, initialMax) {
   render();
   return {
     getCards: () => cards.filter(Boolean),
-    setMax: (n) => { max = n; cards = cards.slice(0, n); openSlot = null; render(); },
-    clear: () => { cards = []; openSlot = null; render(); },
+    setMax: (n) => { max = n; cards = cards.slice(0, n); render(); },
+    clear: () => { cards = []; render(); },
   };
 }
 
@@ -124,17 +135,29 @@ document.querySelectorAll('nav.tabs button').forEach(btn => {
 // borrado: el motor sigue soportándolo igual si algún día vuelve.)
 // ============================================================
 const heroPicker = makeCardPicker('hero-slots', 2);
-const boardPicker = makeCardPicker('board-slots', 0);
+const boardPicker = makeCardPicker('board-slots', 5);
 const deadPicker = makeCardPicker('dead-slots', 4);
 
-const STREET_BOARD_SIZE = {preflop: 0, flop: 3, turn: 4, river: 5};
-const STREET_ORDER = ['preflop', 'flop', 'turn', 'river'];
 const POSITION_OPTIONS = [
   ['', '— sin especificar —'], ['early', 'Temprana'], ['middle', 'Media'], ['late', 'Tardía'],
   ['button', 'Botón'], ['sb', 'Ciega chica'], ['bb', 'Ciega grande'],
 ];
 
-function onBoardChanged() { /* enganche disponible si hace falta reaccionar al completar el board */ }
+// la calle se deduce SOLA de cuántas cartas hay cargadas en el board —
+// ya no hace falta un botón "siguiente calle" que avanza a mano
+function streetFromBoardLength(n) {
+  if (n === 0) return 'preflop';
+  if (n === 3) return 'flop';
+  if (n === 4) return 'turn';
+  if (n === 5) return 'river';
+  return null; // 1 o 2 cartas: todavía no es una calle válida
+}
+
+function onBoardChanged() {
+  const label = document.getElementById('current-street-label');
+  const street = streetFromBoardLength(boardPicker.getCards().length);
+  label.textContent = street || '— cargando board —';
+}
 
 // ---------- configuración de mesa (se recuerda entre manos de la misma sesión) ----------
 let tableSeatActive = {};
@@ -175,7 +198,6 @@ document.getElementById('btn-apply-table-size').onclick = () => {
 // ---------- estado de la mano en curso ----------
 function newHandState() {
   return {
-    street: 'preflop',
     players: {}, // {nombre: {position, active, rangeNotation}}
   };
 }
@@ -189,13 +211,13 @@ function activeNonHeroPlayers() {
 document.getElementById('btn-new-hand').onclick = () => {
   hand = newHandState();
   heroPicker.clear();
-  boardPicker.setMax(0);
   boardPicker.clear();
   deadPicker.clear();
   document.getElementById('table-size-input').value = localStorage.getItem('pokerapp_table_size') || '6';
   document.getElementById('hand-active-ui').style.display = 'block';
-  document.getElementById('hand-status-text').textContent = 'Mano en curso — calle: preflop.';
+  document.getElementById('hand-status-text').textContent = 'Mano en curso.';
   document.getElementById('decision-results').innerHTML = '';
+  onBoardChanged();
   renderSeatConfig();
   // los asientos marcados activos de una mano anterior arrancan cargados solos
   Object.keys(tableSeatActive).forEach(name => {
@@ -204,20 +226,8 @@ document.getElementById('btn-new-hand').onclick = () => {
   refreshHandUI();
 };
 
-document.getElementById('btn-next-street').onclick = () => {
-  if (!hand) return;
-  const idx = STREET_ORDER.indexOf(hand.street);
-  if (idx === STREET_ORDER.length - 1) { alert('Ya estás en el río, no hay más calles.'); return; }
-  hand.street = STREET_ORDER[idx + 1];
-  boardPicker.setMax(STREET_BOARD_SIZE[hand.street]);
-  document.getElementById('hand-status-text').textContent = `Mano en curso — calle: ${hand.street}.`;
-  document.getElementById('decision-results').innerHTML = '';
-  refreshHandUI();
-};
-
 function refreshHandUI() {
   if (!hand) return;
-  document.getElementById('current-street-label').textContent = hand.street;
   refreshSeatActionRow();
   refreshPlayersPanel();
 }
@@ -292,6 +302,11 @@ document.getElementById('btn-calcular').onclick = async () => {
     return;
   }
   const board = boardPicker.getCards();
+  const street = streetFromBoardLength(board.length);
+  if (street === null) {
+    resultsEl.innerHTML = '<div class="notice error">Te faltan cartas para una calle válida — necesitás 0 (preflop), 3 (flop), 4 (turn) o 5 (río) cartas en el board, no 1 ni 2.</div>';
+    return;
+  }
   const dead = deadPicker.getCards();
   const heroRangeNotation = document.getElementById('hero-range').value.trim();
   const heroPosition = document.getElementById('hero-position').value || null;
@@ -309,7 +324,7 @@ document.getElementById('btn-calcular').onclick = async () => {
   });
 
   const body = {
-    hero, board, dead, street: hand.street, facing_bet: false,
+    hero, board, dead, street, facing_bet: false,
     primary_villain: active[0],
     opponents,
     hero_range: heroRangeNotation ? { method: 'notation', notation: heroRangeNotation } : null,
