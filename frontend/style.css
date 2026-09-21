@@ -188,6 +188,7 @@ main {
 }
 .seat-btn.hero-seat { border-color: var(--gold); color: var(--gold-bright); font-weight: 600; }
 .seat-btn.folded { opacity: 0.4; text-decoration: line-through; cursor: default; }
+.seat-btn.retired { opacity: 0.35; cursor: pointer; }
 .seat-btn.off { background: transparent; color: var(--text-dim); border-style: dashed; }
 .seat-btn.open { background: var(--gold); color: #1a1409; border-color: var(--gold); }
 

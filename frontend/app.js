@@ -167,7 +167,7 @@ function renderSeatConfig() {
   const row = document.getElementById('seat-config-row');
   row.innerHTML = '';
   for (let i = 1; i <= size; i++) {
-    const name = `Asiento ${i}`;
+    const name = `A${i}`;
     if (!(name in tableSeatActive)) tableSeatActive[name] = true;
     const btn = document.createElement('div');
     btn.className = 'seat-btn' + (tableSeatActive[name] ? '' : ' off');
@@ -176,7 +176,7 @@ function renderSeatConfig() {
     row.appendChild(btn);
   }
   Object.keys(tableSeatActive).forEach(k => {
-    const num = parseInt(k.replace('Asiento ', ''));
+    const num = parseInt(k.replace('A', ''));
     if (num > size) delete tableSeatActive[k];
   });
 }
@@ -243,8 +243,8 @@ function refreshSeatActionRow() {
   names.forEach(name => {
     const p = hand.players[name];
     const btn = document.createElement('div');
-    btn.className = 'seat-btn' + (p.active ? '' : ' folded');
-    btn.textContent = name + (p.active ? '' : ' — retirado');
+    btn.className = 'seat-btn' + (p.active ? '' : ' retired');
+    btn.textContent = name;
     btn.onclick = () => { hand.players[name].active = !hand.players[name].active; refreshHandUI(); };
     row.appendChild(btn);
   });
