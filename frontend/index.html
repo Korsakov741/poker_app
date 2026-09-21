@@ -43,10 +43,6 @@
           <label>Mis 2 cartas</label>
           <div id="hero-slots" class="card-slots"></div>
         </div>
-        <div class="field" id="initial-pot-field">
-          <label>Bote inicial (ciegas/antes) — se usa UNA sola vez, al arrancar la mano</label>
-          <input type="number" id="initial-pot" placeholder="30" value="0">
-        </div>
       </div>
 
       <div class="card-panel">
@@ -62,30 +58,16 @@
       <div id="decision-results"></div>
 
       <div class="card-panel">
-        <h2>Bote actual: <span class="num" id="pot-display">0</span></h2>
-        <p class="hint" style="margin-bottom:10px">Tocá el asiento del rival que actuó y elegí qué hizo. "Pagar" ya calcula solo cuánto hace falta. Después volvé a tocar "Calcular" arriba si querés ver el resultado actualizado.</p>
+        <h2>Rivales en esta mano</h2>
+        <p class="hint" style="margin-bottom:10px">Tocá para marcar quién sigue activo y quién se retiró — eso solo ya cambia tu % de ganar.</p>
         <div class="seat-row" id="seat-action-row"></div>
-        <div id="action-chooser-container"></div>
-        <div id="action-log-list" style="margin-top:10px"></div>
-        <p class="hint" id="facing-bet-hint" style="margin-top:10px"></p>
-        <div class="field" id="contemplated-bet-field" style="display:none; margin-top:10px">
-          <label>Si pensás apostar (nadie te apostó todavía), ¿cuánto? — opcional, activa candidatos de apostar en "Calcular"</label>
-          <input type="number" id="contemplated-bet" placeholder="ej. 300">
-        </div>
-      </div>
-
-      <div class="card-panel" id="hero-action-panel" style="border-color: var(--gold)">
-        <h2>Mi jugada</h2>
-        <p class="hint" style="margin-bottom:10px">Ya viste el cálculo de arriba — ahora registrá qué hiciste vos.</p>
-        <div class="seat-row" id="hero-action-trigger-row"></div>
-        <div id="hero-action-chooser-container"></div>
       </div>
 
       <button class="secondary" id="btn-next-street" style="margin-top:14px">Siguiente calle →</button>
 
       <details class="collapsible card-panel" style="margin-top:24px">
         <summary>Avanzado — posición, rangos, farol (opcional, no hace falta para jugar)</summary>
-        <p class="hint" style="margin-bottom:10px">La posición de cada rival se carga UNA vez y queda para toda la mano.</p>
+        <p class="hint" style="margin-bottom:10px">Podés escribirle un rango a un rival si tenés una idea de qué puede tener — si no, se usa "cualquier mano al azar".</p>
         <div id="players-panel"><p class="hint">Todavía no hay jugadores — configurá la mesa arriba.</p></div>
 
         <h3 style="margin-top:18px; font-size:1rem">Tu posición y detección de farol</h3>
@@ -192,9 +174,12 @@
 
 <nav class="tabs">
   <button data-view="decision" class="active"><span class="icon">♠</span>Decisión</button>
-  <button data-view="players"><span class="icon">◎</span>Jugadores</button>
-  <button data-view="hands"><span class="icon">✎</span>Manos</button>
-  <button data-view="session"><span class="icon">▤</span>Sesión</button>
+  <!-- Jugadores / Manos / Sesión: ocultas por ahora (modo rápido), no borradas.
+       El código de esas 3 vistas sigue arriba tal cual — para reactivarlas
+       alcanza con volver a mostrar estos 3 botones. -->
+  <!-- <button data-view="players"><span class="icon">◎</span>Jugadores</button> -->
+  <!-- <button data-view="hands"><span class="icon">✎</span>Manos</button> -->
+  <!-- <button data-view="session"><span class="icon">▤</span>Sesión</button> -->
 </nav>
 
 <script src="app.js"></script>

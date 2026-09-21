@@ -26,7 +26,7 @@ from . import montecarlo, exact
 Z_95 = 1.959963984540054  # z para intervalo de confianza del 95%
 
 DEFAULT_MC_SIMS = 30_000
-FALLBACK_MC_SIMS = 100_000  # cuando el espacio exacto es demasiado grande
+FALLBACK_MC_SIMS = 20_000  # cuando el espacio exacto es demasiado grande — antes 100.000 (5x más lento); igualado al resto de la app
 
 
 @dataclass

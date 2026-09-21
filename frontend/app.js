@@ -118,7 +118,10 @@ document.querySelectorAll('nav.tabs button').forEach(btn => {
 });
 
 // ============================================================
-// VISTA: DECISIÓN — "mano en curso"
+// VISTA: DECISIÓN — "mano en curso" (modo rápido: sin bote, sin
+// acciones con monto — solo cartas, quién sigue activo, y rangos
+// opcionales. Todo lo que dependía de montos quedó oculto, no
+// borrado: el motor sigue soportándolo igual si algún día vuelve.)
 // ============================================================
 const heroPicker = makeCardPicker('hero-slots', 2);
 const boardPicker = makeCardPicker('board-slots', 0);
@@ -134,8 +137,6 @@ const POSITION_OPTIONS = [
 function onBoardChanged() { /* enganche disponible si hace falta reaccionar al completar el board */ }
 
 // ---------- configuración de mesa (se recuerda entre manos de la misma sesión) ----------
-// tableSeatActive NO se resetea en "Nueva mano" a propósito — así, si jugás
-// varias manos seguidas con la misma gente, no hay que volver a tocar nada.
 let tableSeatActive = {};
 
 function renderSeatConfig() {
@@ -163,7 +164,7 @@ document.getElementById('btn-apply-table-size').onclick = () => {
   localStorage.setItem('pokerapp_table_size', document.getElementById('table-size-input').value);
   Object.keys(tableSeatActive).forEach(name => {
     if (tableSeatActive[name]) {
-      if (!hand.players[name]) hand.players[name] = { position: '', active: true, rangeNotation: '', suggestedWeights: null };
+      if (!hand.players[name]) hand.players[name] = { position: '', active: true, rangeNotation: '' };
     } else if (hand.players[name]) {
       delete hand.players[name];
     }
@@ -172,252 +173,71 @@ document.getElementById('btn-apply-table-size').onclick = () => {
 };
 
 // ---------- estado de la mano en curso ----------
-// actionHistory guarda TODA la mano (todas las calles) — así los
-// jugadores y sus rangos quedan disponibles aunque cambiés de calle,
-// y "Sugerir rango" puede mirar la última acción real de cada uno.
 function newHandState() {
   return {
-    handId: 'mano-' + Date.now(),
     street: 'preflop',
-    potBeforeStreet: 0,
-    actionHistory: [], // {street, player, type, amount}
-    players: {},         // {nombre: {position, active, rangeNotation, suggestedWeights}}
-    pendingDecisionId: null,
+    players: {}, // {nombre: {position, active, rangeNotation}}
   };
 }
 let hand = null;
-let openActionSeat = null; // nombre del asiento (o 'hero') con el selector de acción abierto
 
-function currentStreetActions() {
-  if (!hand) return [];
-  return hand.actionHistory.filter(a => a.street === hand.street);
-}
-function potNow() {
-  if (!hand) return 0;
-  return hand.potBeforeStreet + currentStreetActions()
-    .filter(a => a.type !== 'fold' && a.type !== 'check')
-    .reduce((s, a) => s + (a.amount || 0), 0);
-}
-// La apuesta "vigente" de la calle es la ÚLTIMA acción de apostar/subir,
-// salteando los retiros y chequeos que hayan pasado después (esos no
-// cambian cuánto hay que pagar). Antes esto miraba solo la ÚLTIMA fila
-// de la lista, así que un retiro después de una apuesta hacía que
-// pareciera que ya no había nada que pagar — bug real, encontrado
-// probando con 3 rivales.
-function currentBetLevelAction() {
-  const acts = currentStreetActions();
-  for (let i = acts.length - 1; i >= 0; i--) {
-    if (acts[i].type === 'bet' || acts[i].type === 'raise') return acts[i];
-  }
-  return null;
-}
-function potBeforeAction(action) {
-  if (!hand) return 0;
-  if (!action) return hand.potBeforeStreet;
-  const acts = currentStreetActions();
-  const idx = acts.indexOf(action);
-  return hand.potBeforeStreet + acts.slice(0, idx)
-    .filter(a => a.type !== 'fold' && a.type !== 'check')
-    .reduce((s, a) => s + (a.amount || 0), 0);
-}
-function facingBetFor(playerName) {
-  const a = currentBetLevelAction();
-  return !!a && a.player !== playerName; // nadie "enfrenta" su propia apuesta
-}
-function betAmountFor(playerName) {
-  return facingBetFor(playerName) ? currentBetLevelAction().amount : null;
-}
-function facingBetNow() { return facingBetFor('hero'); }
-function betAmountFacing() { return betAmountFor('hero'); }
-function potBeforeLastAction() { return potBeforeAction(currentBetLevelAction()); }
 function activeNonHeroPlayers() {
   if (!hand) return [];
   return Object.keys(hand.players).filter(p => hand.players[p].active);
 }
-function primaryVillainName() {
-  if (facingBetNow()) return currentBetLevelAction().player;
-  const active = activeNonHeroPlayers();
-  return active.length ? active[0] : null; // simplificación: si nadie te está apostando, se enfoca el primer rival activo
-}
 
 document.getElementById('btn-new-hand').onclick = () => {
   hand = newHandState();
-  openActionSeat = null;
   heroPicker.clear();
   boardPicker.setMax(0);
   boardPicker.clear();
   deadPicker.clear();
-  document.getElementById('initial-pot').value = localStorage.getItem('pokerapp_default_blinds') || '';
-  document.getElementById('contemplated-bet').value = '';
   document.getElementById('table-size-input').value = localStorage.getItem('pokerapp_table_size') || '6';
-  document.getElementById('initial-pot-field').style.display = 'block';
   document.getElementById('hand-active-ui').style.display = 'block';
-  document.getElementById('hand-status-text').textContent = `Mano en curso (${hand.handId}) — calle: preflop.`;
+  document.getElementById('hand-status-text').textContent = 'Mano en curso — calle: preflop.';
   document.getElementById('decision-results').innerHTML = '';
   renderSeatConfig();
-  hand.potBeforeStreet = parseFloat(document.getElementById('initial-pot').value) || 0;
-  // los asientos que ya estaban marcados activos de una mano anterior arrancan cargados solos
+  // los asientos marcados activos de una mano anterior arrancan cargados solos
   Object.keys(tableSeatActive).forEach(name => {
-    if (tableSeatActive[name]) hand.players[name] = { position: '', active: true, rangeNotation: '', suggestedWeights: null };
+    if (tableSeatActive[name]) hand.players[name] = { position: '', active: true, rangeNotation: '' };
   });
   refreshHandUI();
 };
-
-document.getElementById('initial-pot').addEventListener('input', () => {
-  if (!hand) return;
-  hand.potBeforeStreet = parseFloat(document.getElementById('initial-pot').value) || 0;
-  localStorage.setItem('pokerapp_default_blinds', document.getElementById('initial-pot').value);
-  refreshHandUI();
-});
-
-function logAction(player, type, amount) {
-  hand.actionHistory.push({ street: hand.street, player, type, amount });
-
-  if (player !== 'hero') {
-    if (type === 'fold') hand.players[player].active = false;
-  } else if (hand.pendingDecisionId) {
-    // auto-registrar la acción real de hero contra la última decisión calculada
-    const actionMap = { fold: 'fold', check: 'check', call: 'call', bet: 'bet_value', raise: 'bet_value' };
-    api('POST', '/api/session/record-action', {
-      decision_id: hand.pendingDecisionId, hand_id: hand.handId, actual_action: actionMap[type] || type,
-    }).then(res => {
-      const note = document.createElement('div');
-      note.className = 'notice';
-      note.textContent = res.matched_recommendation
-        ? 'Registrado para la sesión — coincidió con la mejor recomendación.'
-        : `Registrado para la sesión — diferencia de valor: ${res.value_gap} (mejor recomendación: ${res.best_recommendation}).`;
-      document.getElementById('decision-results').prepend(note);
-    }).catch(() => { /* si falla el registro de sesión, no interrumpe el resto del flujo */ });
-    hand.pendingDecisionId = null;
-  }
-
-  openActionSeat = null;
-  refreshHandUI();
-}
 
 document.getElementById('btn-next-street').onclick = () => {
   if (!hand) return;
   const idx = STREET_ORDER.indexOf(hand.street);
   if (idx === STREET_ORDER.length - 1) { alert('Ya estás en el río, no hay más calles.'); return; }
-  hand.potBeforeStreet = potNow();
   hand.street = STREET_ORDER[idx + 1];
-  openActionSeat = null;
   boardPicker.setMax(STREET_BOARD_SIZE[hand.street]);
-  document.getElementById('contemplated-bet').value = '';
-  document.getElementById('initial-pot-field').style.display = 'none'; // ya cumplió su única función
-  document.getElementById('hand-status-text').textContent = `Mano en curso (${hand.handId}) — calle: ${hand.street}.`;
+  document.getElementById('hand-status-text').textContent = `Mano en curso — calle: ${hand.street}.`;
   document.getElementById('decision-results').innerHTML = '';
   refreshHandUI();
 };
 
 function refreshHandUI() {
   if (!hand) return;
-  document.getElementById('pot-display').textContent = potNow();
   document.getElementById('current-street-label').textContent = hand.street;
-
-  const listEl = document.getElementById('action-log-list');
-  const acts = currentStreetActions();
-  listEl.innerHTML = acts.length
-    ? acts.map((a) => `<div class="action-item"><span>${a.player} — ${a.type}${a.amount ? ' (+' + a.amount + ')' : ''}</span></div>`).join('')
-    : '<p class="hint">Sin acciones todavía en esta calle.</p>';
-
-  const hintEl = document.getElementById('facing-bet-hint');
-  const contemplatedField = document.getElementById('contemplated-bet-field');
-  if (facingBetNow()) {
-    hintEl.textContent = `Enfrentás una apuesta de ${betAmountFacing()} de ${currentBetLevelAction().player}.`;
-    contemplatedField.style.display = 'none';
-  } else {
-    hintEl.textContent = `Nadie te está apostando ahora mismo — bote ${potNow()}.`;
-    contemplatedField.style.display = 'block';
-  }
-
   refreshSeatActionRow();
-  refreshHeroActionTrigger();
-  renderActionChooser();
   refreshPlayersPanel();
 }
 
 function refreshSeatActionRow() {
   const row = document.getElementById('seat-action-row');
-  row.innerHTML = '';
-
-  activeNonHeroPlayers().forEach(name => {
-    const btn = document.createElement('div');
-    btn.className = 'seat-btn' + (openActionSeat === name ? ' open' : '');
-    btn.textContent = name;
-    btn.onclick = () => { openActionSeat = (openActionSeat === name) ? null : name; refreshSeatActionRow(); refreshHeroActionTrigger(); renderActionChooser(); };
-    row.appendChild(btn);
-  });
-
-  Object.keys(hand.players).filter(n => !hand.players[n].active).forEach(name => {
-    const btn = document.createElement('div');
-    btn.className = 'seat-btn folded';
-    btn.textContent = name;
-    row.appendChild(btn);
-  });
-}
-
-function refreshHeroActionTrigger() {
-  const row = document.getElementById('hero-action-trigger-row');
-  row.innerHTML = '';
-  const heroBtn = document.createElement('div');
-  heroBtn.className = 'seat-btn hero-seat' + (openActionSeat === 'hero' ? ' open' : '');
-  heroBtn.textContent = 'MI JUGADA';
-  heroBtn.onclick = () => { openActionSeat = (openActionSeat === 'hero') ? null : 'hero'; refreshSeatActionRow(); refreshHeroActionTrigger(); renderActionChooser(); };
-  row.appendChild(heroBtn);
-}
-
-function renderActionChooser() {
-  // el selector se dibuja en un contenedor distinto según si es la
-  // acción de un rival (arriba, junto al bote) o la tuya propia (abajo,
-  // después de "Calcular") — Punto 1: tu jugada va DESPUÉS del cálculo
-  const rivalContainer = document.getElementById('action-chooser-container');
-  const heroContainer = document.getElementById('hero-action-chooser-container');
-  const container = openActionSeat === 'hero' ? heroContainer : rivalContainer;
-  (openActionSeat === 'hero' ? rivalContainer : heroContainer).innerHTML = '';
-  if (!openActionSeat) { container.innerHTML = ''; return; }
-
-  // ojo: esto usa la perspectiva del ASIENTO seleccionado (no la de hero) —
-  // cada jugador enfrenta la misma apuesta vigente salvo que sea quien la hizo
-  const facingForThisSeat = facingBetFor(openActionSeat);
-  const callAmountForThisSeat = betAmountFor(openActionSeat);
-  const callLabel = facingForThisSeat ? `Call (${callAmountForThisSeat})` : 'Call';
-  container.innerHTML = `
-    <div class="action-chooser">
-      <div class="action-chooser-grid">
-        <div class="action-chooser-btn fold" data-act="fold">Fold</div>
-        <div class="action-chooser-btn" data-act="check">Check</div>
-        <div class="action-chooser-btn" data-act="call">${callLabel}</div>
-        <div class="action-chooser-btn bet" data-act="betraise">Bet / Raise</div>
-      </div>
-      <div class="field" id="bet-amount-field" style="display:none; margin-top:10px">
-        <label>Monto que agrega con esta apuesta/subida</label>
-        <input type="number" id="bet-amount-input" placeholder="ej. 70">
-        <button class="secondary" id="btn-confirm-bet" style="margin-top:8px">Confirmar</button>
-      </div>
-    </div>`;
-
-  container.querySelectorAll('.action-chooser-btn').forEach(btn => {
-    btn.onclick = () => {
-      const act = btn.dataset.act;
-      if (act === 'betraise') {
-        document.getElementById('bet-amount-field').style.display = 'block';
-        document.getElementById('bet-amount-input').focus();
-        return;
-      }
-      const amount = act === 'call' ? (facingForThisSeat ? callAmountForThisSeat : 0) : 0;
-      logAction(openActionSeat, act, amount);
-    };
-  });
-  const confirmBtn = container.querySelector('#btn-confirm-bet');
-  if (confirmBtn) {
-    confirmBtn.onclick = () => {
-      const amt = parseFloat(document.getElementById('bet-amount-input').value) || 0;
-      if (amt <= 0) { alert('Poné un monto mayor a 0'); return; }
-      const alreadyBetThisStreet = currentStreetActions().some(a => a.type === 'bet' || a.type === 'raise');
-      logAction(openActionSeat, alreadyBetThisStreet ? 'raise' : 'bet', amt);
-    };
+  const names = Object.keys(hand.players);
+  if (!names.length) {
+    row.innerHTML = '<p class="hint">Configurá la mesa arriba para que aparezcan los rivales acá.</p>';
+    return;
   }
+  row.innerHTML = '';
+  names.forEach(name => {
+    const p = hand.players[name];
+    const btn = document.createElement('div');
+    btn.className = 'seat-btn' + (p.active ? '' : ' folded');
+    btn.textContent = name + (p.active ? '' : ' — retirado');
+    btn.onclick = () => { hand.players[name].active = !hand.players[name].active; refreshHandUI(); };
+    row.appendChild(btn);
+  });
 }
 
 function refreshPlayersPanel() {
@@ -448,76 +268,17 @@ function refreshPlayersPanel() {
           <label>Su rango (notación — vacío = cualquier mano al azar)</label>
           <input type="text" class="player-range" placeholder="22+, A9s+, KJo+">
         </div>
-        <button class="secondary btn-suggest-for-player">Sugerir rango según su última acción</button>
-        <div class="suggest-inline-result" style="margin-top:8px"></div>
       `;
       panel.appendChild(card);
-
       card.querySelector('.player-position').value = p.position || '';
       card.querySelector('.player-range').value = p.rangeNotation || '';
-
-      card.querySelector('.player-position').addEventListener('change', (e) => {
-        hand.players[name].position = e.target.value;
-      });
-      card.querySelector('.player-range').addEventListener('input', (e) => {
-        hand.players[name].rangeNotation = e.target.value;
-        hand.players[name].suggestedWeights = null; // escribir a mano cancela la sugerencia
-      });
-      card.querySelector('.btn-suggest-for-player').onclick = () => suggestRangeFor(name, card);
+      card.querySelector('.player-position').addEventListener('change', (e) => { hand.players[name].position = e.target.value; });
+      card.querySelector('.player-range').addEventListener('input', (e) => { hand.players[name].rangeNotation = e.target.value; });
     }
-    // esto SÍ se actualiza en cada refresco, sin recrear el input (no se pierde lo que el usuario tipeó)
     const badge = card.querySelector('.player-status-badge');
     badge.textContent = p.active ? 'activo' : 'retirado';
     card.style.opacity = p.active ? '1' : '0.5';
   });
-}
-
-async function suggestRangeFor(name, cardEl) {
-  const resultEl = cardEl.querySelector('.suggest-inline-result');
-  // busca la ÚLTIMA acción de ESTE jugador en la calle actual (simplificación:
-  // no mira calles anteriores — si todavía no actuó en esta calle, pide que actúe primero)
-  const acts = currentStreetActions().filter(a => a.player === name);
-  if (!acts.length) {
-    resultEl.innerHTML = '<div class="notice error">Este jugador todavía no actuó en esta calle.</div>';
-    return;
-  }
-  const action = acts[acts.length - 1];
-  if (!['call', 'bet', 'raise'].includes(action.type)) {
-    resultEl.innerHTML = '<div class="notice error">Hace falta una acción de pagar, apostar o subir.</div>';
-    return;
-  }
-  const idxInStreet = currentStreetActions().indexOf(action);
-  const potBefore = hand.potBeforeStreet + currentStreetActions().slice(0, idxInStreet)
-    .filter(a => a.type !== 'fold' && a.type !== 'check')
-    .reduce((s, a) => s + (a.amount || 0), 0);
-  if (potBefore <= 0 || !action.amount) {
-    resultEl.innerHTML = '<div class="notice error">Hace falta un bote de referencia y un monto en la acción.</div>';
-    return;
-  }
-  const potFraction = action.amount / potBefore;
-  const numPlayersRaw = document.getElementById('num-players').value;
-  const numPlayers = numPlayersRaw ? parseInt(numPlayersRaw) : null;
-
-  resultEl.innerHTML = '<div class="notice">Calculando…</div>';
-  try {
-    const r = await api('POST', '/api/ranges/suggest', {
-      villain_label: name, street: hand.street, pot_fraction: potFraction,
-      action_type: action.type, villain_position: hand.players[name].position || null, num_players: numPlayers,
-    });
-    const sourceLabel = r.source === 'real_sizing_tell_ewma'
-      ? `datos reales de este jugador (${r.n_observations} observaciones)`
-      : 'una heurística genérica (todavía no hay datos suficientes de este jugador en esta calle/tamaño)';
-    resultEl.innerHTML = `<div class="notice">~${r.combo_count} combos, basada en ${sourceLabel}${r.position_informed ? ' + su posición' : ' (sin posición cargada)'}.</div>
-      <button class="secondary btn-use-suggestion" style="margin-top:8px">Usar esta sugerencia</button>`;
-    resultEl.querySelector('.btn-use-suggestion').onclick = () => {
-      hand.players[name].suggestedWeights = r.weights;
-      hand.players[name].rangeNotation = '';
-      cardEl.querySelector('.player-range').value = '';
-      resultEl.innerHTML = `<div class="notice">Sugerencia aplicada (~${r.combo_count} combos) — escribir en "Su rango" la reemplaza.</div>`;
-    };
-  } catch (e) {
-    resultEl.innerHTML = `<div class="notice error">${e.message}</div>`;
-  }
 }
 
 document.getElementById('btn-calcular').onclick = async () => {
@@ -532,20 +293,6 @@ document.getElementById('btn-calcular').onclick = async () => {
   }
   const board = boardPicker.getCards();
   const dead = deadPicker.getCards();
-  const street = hand.street;
-  const facingBet = facingBetNow();
-  let bet, pot;
-  if (facingBet) {
-    bet = betAmountFacing();
-    pot = potBeforeLastAction();
-  } else {
-    // nadie te apostó — si cargaste cuánto pensás apostar, se manda igual
-    // (así "Calcular" también puede evaluar apostar de valor/farol, no solo chequear)
-    const contemplated = document.getElementById('contemplated-bet').value;
-    bet = contemplated ? parseFloat(contemplated) : null;
-    pot = potNow();
-  }
-  const primary = primaryVillainName();
   const heroRangeNotation = document.getElementById('hero-range').value.trim();
   const heroPosition = document.getElementById('hero-position').value || null;
   const numPlayersRaw = document.getElementById('num-players').value;
@@ -558,17 +305,12 @@ document.getElementById('btn-calcular').onclick = async () => {
   }
   const opponents = active.map(name => {
     const p = hand.players[name];
-    let range;
-    if (p.rangeNotation) range = { method: 'notation', notation: p.rangeNotation };
-    else if (p.suggestedWeights) range = { method: 'paint', paint: p.suggestedWeights };
-    else range = { method: 'random' };
-    return { label: name, range };
+    return { label: name, range: p.rangeNotation ? { method: 'notation', notation: p.rangeNotation } : { method: 'random' } };
   });
 
   const body = {
-    hero, board, dead, street, facing_bet: facingBet,
-    bet, pot,
-    primary_villain: primary,
+    hero, board, dead, street: hand.street, facing_bet: false,
+    primary_villain: active[0],
     opponents,
     hero_range: heroRangeNotation ? { method: 'notation', notation: heroRangeNotation } : null,
     hero_position: heroPosition,
@@ -578,7 +320,6 @@ document.getElementById('btn-calcular').onclick = async () => {
 
   try {
     const r = await api('POST', '/api/decision', body);
-    hand.pendingDecisionId = r.decision_id;
     renderDecisionResults(r);
   } catch (e) {
     resultsEl.innerHTML = `<div class="notice error">${e.message}</div>`;
@@ -616,45 +357,9 @@ function renderDecisionResults(r) {
       html += b.danger_cards.map(d => `<p class="hint">⚠️ ${d}</p>`).join('');
     }
     html += '</div>';
+  } else if (r.street === 'preflop') {
+    html += '<p class="hint">Cargá las 3 cartas del flop para ver "Cantos" (tu mano clasificada y la del rival).</p>';
   }
-
-  html += '<div class="card-panel"><h2>Acciones candidatas</h2>';
-  const maxAbs = Math.max(...r.candidates.map(c => Math.abs(c.heuristic_value)), 0.01);
-  r.candidates.forEach(c => {
-    const cls = c.heuristic_value > 0 ? 'pos' : (c.heuristic_value < 0 ? 'neg' : '');
-    const pct = Math.min(100, Math.abs(c.heuristic_value) / maxAbs * 100);
-    const actionLabel = {fold: 'Retirarse', call: 'Pagar', check: 'Chequear', bet_value: 'Apostar (valor)', bet_bluff: 'Apostar (farol)'}[c.action] || c.action;
-    html += `<div class="candidate">
-      <div class="candidate-head">
-        <span class="candidate-action">${actionLabel}</span>
-        <span class="candidate-value ${cls}">${c.heuristic_value >= 0 ? '+' : ''}${c.heuristic_value}</span>
-      </div>
-      <div class="value-track"><div class="value-fill" style="width:${pct}%"></div></div>
-      <div class="candidate-reasons">${c.top_reasons.map(x => `<p>${x}</p>`).join('')}</div>
-    </div>`;
-  });
-  html += '</div>';
-
-  if (r.gto_exploit) {
-    html += `<div class="card-panel"><h2>Mezcla GTO / Explotador</h2>
-      <p><span class="num">${Math.round(r.gto_exploit.weight_exploit_final*100)}%</span> línea explotadora
-      <span class="badge">Punto 11</span></p>
-      <p class="hint">${r.gto_exploit.reasoning}</p>
-    </div>`;
-  }
-
-  if (r.bluff_opportunity) {
-    const b = r.bluff_opportunity;
-    html += `<div class="card-panel"><h2>Oportunidad de farol</h2>
-      <p>${b.estimated_success_pct}% estimado vs. ${b.min_required_pct}% mínimo necesario
-      <span class="badge">${b.is_above_threshold ? 'supera el umbral' : 'no supera el umbral'}</span></p>`;
-    if (b.top_candidates && b.top_candidates.length) {
-      html += '<p class="hint">Mejores combos candidatos: ' + b.top_candidates.map(c => c.hand_type).join(', ') + '</p>';
-    }
-    html += '</div>';
-  }
-
-  html += `<div class="notice">Cuando decidas, tocá "MI JUGADA" arriba — queda guardada sola para la revisión de sesión.</div>`;
 
   el.innerHTML = html;
 }
