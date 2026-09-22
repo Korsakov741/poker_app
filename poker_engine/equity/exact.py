@@ -91,41 +91,54 @@ def run_exact(
 
     hero_t = [to_treys(c) for c in hero]
 
-    # Producto cartesiano de: combo elegido por cada rival x carta de río (si aplica).
-    for combo_assignment in product(*opponent_valid):
-        # Remoción cruzada entre rivales dentro de esta combinación puntual.
-        used_cards = set(base_used)
-        conflict = False
-        for combo in combo_assignment:
-            if combo.card1 in used_cards or combo.card2 in used_cards:
-                conflict = True
-                break
-            used_cards.add(combo.card1)
-            used_cards.add(combo.card2)
-        if conflict:
-            continue  # combinación inválida (dos rivales compartirían una carta)
+    # OPTIMIZACIÓN (misma precisión, mismo resultado exacto — solo evita
+    # recalcular lo mismo miles/millones de veces): antes, el puntaje de
+    # mi mano y el de CADA combo de cada rival se recalculaban una vez
+    # por cada combinación posible con los demás rivales — si un rival
+    # tiene 1225 combos posibles (rango al azar) y otro también, cada
+    # combo del rival A se evaluaba 1225 veces (una por cada combo del
+    # rival B), cuando el resultado es siempre el mismo. Ahora cada
+    # puntaje se calcula UNA sola vez por carta de río y se reutiliza.
+    combo_cards_t = [
+        {combo: [to_treys(c) for c in combo.cards()] for combo in valid_list}
+        for valid_list in opponent_valid
+    ]
 
-        weight_product = 1.0
-        for combo in combo_assignment:
-            weight_product *= combo.weight
-        if weight_product <= 0:
-            continue
+    for river_card in river_candidates:
+        full_board_str = board + ([river_card] if river_card else [])
+        full_board_t = [to_treys(c) for c in full_board_str]
 
-        if need_river:
-            valid_rivers = [r for r in river_candidates if r not in used_cards]
-        else:
-            valid_rivers = [None]
+        hero_score = evaluator.score(full_board_t, hero_t)
+        combo_score_by_opponent = []
+        for cache in combo_cards_t:
+            scores = {}
+            for combo, cards_t in cache.items():
+                if river_card and (combo.card1 == river_card or combo.card2 == river_card):
+                    continue  # esta combinación no es válida para ESTA carta de río puntual — no evaluar (el chequeo de abajo ya la descarta de todas formas)
+                scores[combo] = evaluator.score(full_board_t, cards_t)
+            combo_score_by_opponent.append(scores)
 
-        for river_card in valid_rivers:
-            full_board_str = board + ([river_card] if river_card else [])
-            full_board_t = [to_treys(c) for c in full_board_str]
+        for combo_assignment in product(*opponent_valid):
+            used_cards = set(base_used) | ({river_card} if river_card else set())
+            conflict = False
+            for combo in combo_assignment:
+                if combo.card1 in used_cards or combo.card2 in used_cards:
+                    conflict = True
+                    break
+                used_cards.add(combo.card1)
+                used_cards.add(combo.card2)
+            if conflict:
+                continue  # combinación inválida (dos rivales compartirían una carta, o chocan con el río)
 
-            hero_score = evaluator.score(full_board_t, hero_t)
-            opp_scores = [
-                evaluator.score(full_board_t, [to_treys(c) for c in combo.cards()])
-                for combo in combo_assignment
+            weight_product = 1.0
+            for combo in combo_assignment:
+                weight_product *= combo.weight
+            if weight_product <= 0:
+                continue
+
+            all_scores = [hero_score] + [
+                combo_score_by_opponent[i][combo] for i, combo in enumerate(combo_assignment)
             ]
-            all_scores = [hero_score] + opp_scores
             best = min(all_scores)
             winners = [i for i, s in enumerate(all_scores) if s == best]
 
