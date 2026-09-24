@@ -355,7 +355,12 @@ function renderDecisionResults(r) {
     html += '<div class="card-panel"><h2>Equity</h2><div class="equity-bar">';
     r.equity.players.forEach((p, idx) => {
       const colors = ['var(--gold)', 'var(--bg-raised)', '#3a4a40', '#4a5a50'];
-      html += `<div class="equity-seg" style="width:${p.equity_pct}%; background:${colors[idx % colors.length]}; color:${idx===0?'#1a1409':'var(--text)'}">${p.label} ${p.equity_pct}%</div>`;
+      // flex-grow en vez de width fijo: así cada jugador tiene un ancho
+      // MÍNIMO garantizado (min-width) aunque su equity sea 0% — antes,
+      // con 0%, el segmento quedaba con ancho cero y el número
+      // desaparecía por completo (el bote SIGUE mostrando el número real,
+      // esto es solo un arreglo de cómo se ve, no del cálculo)
+      html += `<div class="equity-seg" style="flex-grow:${Math.max(p.equity_pct, 0.1)}; flex-basis:0; min-width:54px; background:${colors[idx % colors.length]}; color:${idx===0?'#1a1409':'var(--text)'}">${p.label} ${p.equity_pct}%</div>`;
     });
     html += `</div><p class="hint">Modo: ${r.equity.mode}</p></div>`;
   }
